@@ -21,6 +21,7 @@ $ make && redis-server --loadmodule modules/bucket.so
 - BUCKET.GET bucket
 - BUCKET.GET bucket key
 - BUCKET.GET bucket key field 
+- BUCKET.UPDATE bucket key field1 newvalue1 filed2 newvalue2
 - BUCKET.INCR bucket key field count
 - BUCKET.RANGE bucket start_score end_score
 - BUCKET.DEL bucket
