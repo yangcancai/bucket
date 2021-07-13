@@ -166,7 +166,90 @@ int BucketIncr_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int a
     ReleaseId(ctx, id_str);
     return REDISMODULE_OK;
 }
+int BucketDelAll_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
+{
+   if (argc != 2) {
+       return RedisModule_WrongArity(ctx);
+   }   
+    // bucket_key be a zset
+   RedisModuleKey *key = RedisModule_OpenKey(ctx,argv[1],
+        REDISMODULE_READ|REDISMODULE_WRITE);
+   if (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_ZSET&&
+	RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_EMPTY){
+	RedisModule_CloseKey(key);
+        return RedisModule_ReplyWithError(ctx,REDISMODULE_ERRORMSG_WRONGTYPE);
 
+   }
+   // zset
+    RedisModule_ZsetFirstInScoreRange(key,REDISMODULE_NEGATIVE_INFINITE,REDISMODULE_POSITIVE_INFINITE,0,0);
+    while(!RedisModule_ZsetRangeEndReached(key)) {
+    double score;
+    RedisModuleString *ele = RedisModule_ZsetRangeCurrentElement(key,&score);
+	RedisModuleCallReply *reply;
+	reply = RedisModule_Call(ctx,"DEL","s",ele);
+    RedisModule_FreeCallReply(reply);
+    RedisModule_FreeString(ctx, ele);
+    RedisModule_ZsetRangeNext(key);
+    }
+    RedisModule_ZsetRangeStop(key);
+    RedisModuleCallReply *reply1;
+	reply1 = RedisModule_Call(ctx,"DEL","s",argv[1]);
+    RedisModule_ReplyWithCallReply(ctx, reply1);
+ 	RedisModule_FreeCallReply(reply1);
+    RedisModule_CloseKey(key);
+    return REDISMODULE_OK;
+
+}
+
+/*
+* BUCKET.DEL bucket_key
+* BUCKET.DEL bucket_key id
+* BUCKET.DEL bucket_key id name
+*/
+int BucketDel_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
+{
+   if (argc == 2) {
+       return BucketDelAll_RedisCommand(ctx, argv, argc);
+   }else if(argc != 3 && argc != 4){
+       return RedisModule_WrongArity(ctx);
+   }   
+   RedisModuleString *id_str = CreateId(ctx, argv[1], argv[2]);
+    RedisModuleKey *id = RedisModule_OpenKey(ctx,id_str, REDISMODULE_READ|REDISMODULE_WRITE);
+    if (RedisModule_KeyType(id)  != REDISMODULE_KEYTYPE_HASH &&
+	RedisModule_KeyType(id) != REDISMODULE_KEYTYPE_EMPTY){
+	RedisModule_CloseKey(id);
+	ReleaseId(ctx, id_str);
+        return RedisModule_ReplyWithError(ctx,REDISMODULE_ERRORMSG_WRONGTYPE);
+    }
+    // bucket_key be a zset
+    RedisModuleKey *key = RedisModule_OpenKey(ctx,argv[1],
+        REDISMODULE_READ|REDISMODULE_WRITE);
+   if (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_ZSET&&
+	RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_EMPTY){
+	RedisModule_CloseKey(key);
+	RedisModule_CloseKey(id);
+	ReleaseId(ctx, id_str);
+        return RedisModule_ReplyWithError(ctx,REDISMODULE_ERRORMSG_WRONGTYPE);
+
+   }
+   if (argc == 4){
+    RedisModuleCallReply *reply;
+    reply = RedisModule_Call(ctx,"HDEL","ss", id_str, argv[3]);
+    RedisModule_ReplyWithCallReply(ctx, reply);
+    RedisModule_FreeCallReply(reply);
+   }else{
+    RedisModuleCallReply *reply;
+    reply = RedisModule_Call(ctx,"DEL","s", id_str);
+    RedisModule_ZsetRem(key, id_str, NULL);
+    RedisModule_ReplyWithCallReply(ctx, reply);
+    RedisModule_FreeCallReply(reply);
+   }
+    RedisModule_CloseKey(id);
+    RedisModule_CloseKey(key);
+    ReleaseId(ctx, id_str);
+    return REDISMODULE_OK;
+}
+ 
 /* 
 * BUCKET.GETALL bucket_key
 */
@@ -371,5 +454,10 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
    if (RedisModule_CreateCommand(ctx,"bucket.incr",
          BucketIncr_RedisCommand,"write deny-oom",1,2,1) == REDISMODULE_ERR)
          return REDISMODULE_ERR;
+
+   if (RedisModule_CreateCommand(ctx,"bucket.del",
+         BucketDel_RedisCommand,"write deny-oom",1,2,1) == REDISMODULE_ERR)
+         return REDISMODULE_ERR;
+
      return REDISMODULE_OK;
 }
