@@ -2,12 +2,18 @@
 
 ## How it works
 
-### Build 
-- $ make 
+### Build and Loadmodule
+
+```shell
+$ git clone https://github.com/yangcancai/bucket.git
+$ cd bucket
+$ make && redis-server --loadmodule modules/bucket.so
+
+```
 
 ### LoadModule
 
-- redis-server --loadmodule bucket.so
+- redis-server --loadmodule modules/bucket.so
 
 ### Bucket command 
 
