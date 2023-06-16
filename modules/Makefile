@@ -10,7 +10,12 @@ else
 	SHOBJ_CFLAGS ?= -W -Wall -dynamic -fno-common -g -ggdb -std=c99 -O2
 	SHOBJ_LDFLAGS ?= -bundle -undefined dynamic_lookup
 endif
-
+# OS X 11.x doesn't have /usr/lib/libSystem.dylib and needs an explicit setting.
+ifeq ($(uname_S),Darwin)
+ifeq ("$(wildcard /usr/lib/libSystem.dylib)","")
+LIBS = -L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib -lsystem
+endif
+endif
 .SUFFIXES: .c .so .xo .o
 
 all: bucket.so 
